@@ -1,0 +1,133 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>第1段階10秒版｜第3段階やや強め・半透明濃い版｜人体骨格 3D｜見下ろし視点修正版・厚みのあるマット</title><style>
+:root{font-family:system-ui,-apple-system,'Noto Sans JP',sans-serif;color:#13263d;background:#eff3fa}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1080px;margin:auto;padding:20px 14px 35px}h1{font-size:clamp(21px,3vw,29px);margin:4px 0 7px}p{color:#526980;line-height:1.6}.layout{display:grid;grid-template-columns:minmax(0,1fr) 245px;gap:14px}.viewport{height:510px;position:relative;background:radial-gradient(ellipse at 47% 25%,#ffffff,#dbe8f6);border-radius:18px;overflow:hidden;border:1px solid #cedeed;touch-action:none;cursor:grab}.viewport:active{cursor:grabbing}canvas{width:100%;height:100%;display:block}.hint{position:absolute;left:12px;bottom:12px;padding:6px 10px;background:#ffffffc9;border-radius:9px;color:#52677a;font-size:12px;pointer-events:none}.side{background:white;border:1px solid #dce5ef;border-radius:16px;padding:14px}.side h2{font-size:15px;margin:5px 0 11px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:9px 0}button,select{padding:9px 11px;border:1px solid #c5d5e5;border-radius:9px;background:#f7faff;color:#17426e;cursor:pointer;font:inherit}button.primary{background:#1557a2;color:white;font-weight:700}button.active{background:#dceaff;border-color:#1365b9}button:focus-visible{outline:3px solid orange}label{font-size:13px;color:#566779}input[type=range]{width:100%;accent-color:#1674c6}.small{font-size:12px;color:#64758c}.phase{background:#eff6ff;border-radius:10px;padding:11px;margin:10px 0;font-size:14px;min-height:68px}.box{background:#fff;border:1px solid #dce5ef;padding:14px;margin-top:14px;border-radius:14px}.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:#425a72}.circle{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px}.warn{font-size:12px;color:#586d82}.code{font-variant-numeric:tabular-nums}@media(max-width:760px){.layout{grid-template-columns:1fr}.viewport{height:440px}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px}.side h2,.side .wide{grid-column:1/-1}}
+</style></head><body><main class="wrap"><h1>骨格透視モデル 3D ｜見下ろし角度修正版</h1><p>青い立体骨格を半透明の人体に重ねた<strong>回転できる試作モデル</strong>。カメラの上下角度を反転し、左臀部の後方斜め・真横・正面を上から見下ろす角度にしました。マットレスの厚みも表示しています。第1〜3段階の動きは前回と同じです。</p><div class="layout"><div class="viewport" id="view"><canvas id="cv" aria-label="回転可能な三次元骨格の運動モデル"></canvas><div class="hint">ドラッグ：回転　・　ホイール：拡大／縮小</div></div><aside class="side"><h2>アニメーション</h2><div class="row wide"><button id="play" class="primary">⏸ 一時停止</button><button id="reset">↺ 最初から</button></div><label class="wide">練習の進行　<span id="progressText" class="code">0%</span></label><input class="wide" type="range" id="progress" min="0" max="100" value="0"><div class="phase wide" id="phase">① 膝を大きく浮かせて落とす</div><label>速さ</label><select id="speed"><option value=".65">ゆっくり</option><option value="1" selected>標準</option><option value="1.5">速く</option></select><label>足先の形</label><select id="feet"><option value="toe" selected>つま先で支える</option><option value="flat">足の甲を寝かせる</option><option value="frog">足先を外へ開く</option></select><h2 class="wide">視点</h2><div class="row wide"><button id="side" class="active">真横</button><button id="oblique">左後方・見下ろし</button><button id="front">正面</button></div><div class="wide"><label><input type="checkbox" id="skin" checked> 半透明の身体</label></div><div class="wide"><label><input type="checkbox" id="bones" checked> 骨格を表示</label></div><div class="wide"><label><input type="checkbox" id="arrows" checked> 大腿骨方向の矢印</label></div></aside></div><div class="box"><div class="legend"><span><i class="circle" style="background:#007cfa"></i>骨格</span><span><i class="circle" style="background:#cedded"></i>半透明の身体</span><span><i class="circle" style="background:#f28e35"></i>大腿骨方向</span><span><i class="circle" style="background:#8badcf"></i>厚みのあるマットレス</span></div><p class="warn">これは骨の形状と身体運動を理解するための概念的な3Dモデルです。医療用スキャンや精密な解剖学モデルではなく、関節と骨の一部を簡略化しています。膝を強く打ちつけず、痛みのない範囲で確認してください。</p></div></main><script>
+(()=>{
+const $=id=>document.getElementById(id),cv=$('cv'),ctx=cv.getContext('2d'),view=$('view');
+let yaw=0,pitch=-.48,zoom=1,playing=true,elapsed=0,last=0,progress=0,drag=false,oldX=0,oldY=0;
+const C={blue:[6,126,239],light:[64,198,255],white:[213,229,247],orange:[244,135,38],bed:[144,176,209],outline:[35,94,164]};
+const P=(x,y,z)=>({x,y,z}); const interp=(a,b,t)=>P(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t);
+const plus=(a,b)=>P(a.x+b.x,a.y+b.y,a.z+b.z),minus=(a,b)=>P(a.x-b.x,a.y-b.y,a.z-b.z),mul=(a,s)=>P(a.x*s,a.y*s,a.z*s),len=a=>Math.hypot(a.x,a.y,a.z),norm=a=>mul(a,1/(len(a)||1)),cross=(a,b)=>P(a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x);
+const scene=[],lineSet=[];
+function uvBall(c,r,color,alpha=1,nu=12,nv=8){const v=[];for(let j=0;j<=nv;j++){const t=j*Math.PI/nv;for(let i=0;i<=nu;i++){const ph=i*2*Math.PI/nu;v.push(P(c.x+r[0]*Math.sin(t)*Math.cos(ph),c.y+r[1]*Math.sin(t)*Math.sin(ph),c.z+r[2]*Math.cos(t)));}}
+for(let j=0;j<nv;j++)for(let i=0;i<nu;i++){const a=j*(nu+1)+i,b=a+nu+1;scene.push({v:[v[a],v[a+1],v[b+1],v[b]],col:color,alpha});}}
+function tube(a,b,r,color,alpha=1,sections=9){let dir=norm(minus(b,a)),basis=norm(cross(dir,Math.abs(dir.z)<.8?P(0,0,1):P(1,0,0))),basis2=cross(dir,basis);let va=[],vb=[];for(let j=0;j<sections;j++){let ang=j*2*Math.PI/sections;const u=plus(mul(basis,Math.cos(ang)*r),mul(basis2,Math.sin(ang)*r));va.push(plus(a,u));vb.push(plus(b,u));}for(let j=0;j<sections;j++){const k=(j+1)%sections;scene.push({v:[va[j],va[k],vb[k],vb[j]],col:color,alpha});}uvBall(a,[r,r,r],color,alpha,8,5);uvBall(b,[r,r,r],color,alpha,8,5)}
+function polyline(pts,r,color,alpha=1){for(let i=0;i<pts.length-1;i++)tube(pts[i],pts[i+1],r,color,alpha,8)}
+function line(a,b,col,width=2){lineSet.push({a,b,col,width})}
+function sph(c,r,col=C.blue,alpha=1){uvBall(c,[r,r,r],col,alpha)}
+const px=(x,y,z,side=0)=>P((x-406)/130,side,(335-y)/130);
+const ank={x:548,y:321},sho={x:239,y:192},rib={x:349,y:177};
+const shin=115,thigh=111,torso=218,angle1=-2.48,angle2=-3.16;
+function bodyKinematics(q,t){const cyc=(1+Math.cos(2*Math.PI*t))/2;
+const finalBoost=Math.max(0,Math.min(1,(q-.72)/.18));
+const smoothBoost=finalBoost*finalBoost*(3-2*finalBoost);
+const amp=.92*Math.pow(1-q,2.25)+.10+.12*smoothBoost;
+const v=1-amp*cyc;
+const originalAngle=angle1+(angle2-angle1)*v;
+// In the final stage, keep the knee cap at mattress level at the top,
+// then push it a little into the mattress (rather than lifting clear).
+const stageContact=Math.max(0,Math.min(1,(q-.72)/.22));
+const contactEase=stageContact*stageContact*(3-2*stageContact);
+const contactAngle=-3.177-(.105*(1-cyc));
+const a=originalAngle*(1-contactEase)+contactAngle*contactEase;
+const kn={x:ank.x+shin*Math.cos(a),y:ank.y+shin*Math.sin(a)};
+const dx=kn.x-sho.x,dy=kn.y-sho.y,d=Math.hypot(dx,dy);let aa=(torso*torso-thigh*thigh+d*d)/(2*d),hh=Math.sqrt(Math.max(0,torso*torso-aa*aa));let mx=sho.x+aa*dx/d,my=sho.y+aa*dy/d;
+const h1={x:mx-hh*dy/d,y:my+hh*dx/d},h2={x:mx+hh*dy/d,y:my-hh*dx/d};const hip=h1.y<h2.y?h1:h2;
+return {hip,kn,cyc};}
+function build(q,t){scene.length=0;lineSet.length=0;const kine=bodyKinematics(q,t),{hip,kn}=kine;
+const hip3=px(hip.x,hip.y,0),knee3=px(kn.x,kn.y,0),ank3=px(548,321,0),rib3=px(378,177,0),shoulder=px(239,192,0);
+const ftype=$('feet').value,spread=ftype==='frog'?.48:.21;
+// mattress surface: displacement begins at baseline and is exclusively downward under each knee
+const q3=Math.max(0,Math.min(1,(q-.65)/.25)),baseline=0;
+const stageContact=Math.max(0,Math.min(1,(q-.72)/.22));
+const contact=Math.max(0,Math.min(1,(kn.y+16-326)/10));
+// Knee joint radius is about .076 world units. The uncompressed top is z=0.
+// Mattress depression tracks only penetration below that top, never lifts upward.
+const kneeBottom=knee3.z-.076;
+const depth=Math.max(0,-kneeBottom);
+const press=contact*(.034+.06*q3)*(1-stageContact)+depth*stageContact;
+const kneeBedX=(kn.x-406)/130;
+const fall=(x,y)=>{const dist=Math.min(Math.hypot(x-kneeBedX,y-.27),Math.hypot(x-kneeBedX,y+.27));return -press*Math.exp(-dist*dist/.12)};
+const nx=42,ny=20,xmin=-3.2,xmax=3.15,ymin=-1.1,ymax=1.1;
+// Visible mattress thickness: top is z=0 and bottom is z=-0.32.
+const bottomZ=-.32;
+scene.push({v:[P(xmin,ymin,0),P(xmax,ymin,0),P(xmax,ymin,bottomZ),P(xmin,ymin,bottomZ)],col:[117,153,193],alpha:1});
+scene.push({v:[P(xmin,ymax,0),P(xmax,ymax,0),P(xmax,ymax,bottomZ),P(xmin,ymax,bottomZ)],col:[137,172,207],alpha:1});
+scene.push({v:[P(xmin,ymin,0),P(xmin,ymax,0),P(xmin,ymax,bottomZ),P(xmin,ymin,bottomZ)],col:[113,149,186],alpha:1});
+scene.push({v:[P(xmax,ymin,0),P(xmax,ymax,0),P(xmax,ymax,bottomZ),P(xmax,ymin,bottomZ)],col:[110,147,186],alpha:1});
+
+for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+const a=P(xmin+(xmax-xmin)*i/nx,ymin+(ymax-ymin)*j/ny,fall(xmin+(xmax-xmin)*i/nx,ymin+(ymax-ymin)*j/ny));
+const b=P(xmin+(xmax-xmin)*(i+1)/nx,a.y,fall(xmin+(xmax-xmin)*(i+1)/nx,a.y));
+const c=P(b.x,ymin+(ymax-ymin)*(j+1)/ny,fall(b.x,ymin+(ymax-ymin)*(j+1)/ny));
+const d=P(a.x,c.y,fall(a.x,c.y));scene.push({v:[a,b,c,d],col:[190,211,234],alpha:1});
+}
+const skin=$('skin').checked,bones=$('bones').checked;
+const ySides=[-.27,.27];
+for(const sy of ySides){
+const sign=sy>0?1:-1;
+const hipSide=0.18*sign;
+const kneeSide=0.78*sign;
+const ankleSide=0.66*sign;
+const H=P(hip3.x,hipSide,hip3.z),K=P(knee3.x,kneeSide,knee3.z),A=P(ank3.x,ankleSide,ank3.z);
+// Wider arm stance: shoulders stay on torso, elbows and hands spread outward.
+const S=P(shoulder.x,sign*.28,shoulder.z),R=P(rib3.x,sign*.22,rib3.z);
+const elbow=P((206-406)/130,sign*.57,(335-262)/130),wrist=P((183-406)/130,sign*.80,(335-322)/130);
+const hand=P((171-406)/130,sign*.86,(335-334)/130);
+let heel=P(A.x-.01,ankleSide,A.z+.10),ball=P((602-406)/130,ankleSide+sign*spread,.014);
+if(ftype==='flat'){heel=P(A.x+.1,ankleSide,.04);ball=P((618-406)/130,ankleSide+sign*spread,.013)}
+if(skin){tube(H,K,.16,C.white,.35);tube(K,A,.13,C.white,.36);tube(S,elbow,.11,C.white,.32);tube(elbow,wrist,.1,C.white,.32);tube(A,ball,.075,C.white,.37)}
+if(bones){tube(H,K,.052,C.blue);tube(K,A,.045,C.blue);tube(S,elbow,.044,C.blue);tube(elbow,wrist,.035,C.blue);tube(wrist,hand,.035,C.blue);sph(K,.076,C.light);sph(A,.062,C.light);
+// femur condyles
+sph(plus(K,P(0,.065,0)),.057,C.light);sph(plus(K,P(0,-.065,0)),.057,C.light);
+// toes: metatarsal and individual digits
+polyline([A,heel,ball],.031,C.blue);for(let k=-2;k<=2;k++){const toe=plus(ball,P(.035, k*.026, -.01));tube(ball,toe,.012,C.blue,1,6)}
+}
+}
+// torso elongated translucent hull around spine and ribcage
+const spine=[rib3,interp(rib3,hip3,.23),interp(rib3,hip3,.48),interp(rib3,hip3,.72),hip3];
+if(skin){polyline(spine,.20,C.white,.30);uvBall(P((-0.1+rib3.x)/2,0,rib3.z+.03),[.60,.43,.31],C.white,.30)}
+if(bones){polyline(spine,.045,C.blue);for(const s of spine){uvBall(s,[.055,.067,.065],C.light,1,10,7)}
+// ribs: 10 nested curved pairs surrounding upper torso in three dimensions
+for(let i=0;i<10;i++){let center=interp(shoulder,rib3,.12+.08*i);let width=.23+Math.sin((i+.5)/10*Math.PI)*.10;
+for(let sign of [-1,1]){let ribs=[];for(let k=0;k<=11;k++){let a=k*Math.PI/11;ribs.push(P(center.x+.03*Math.sin(a),sign*(.05+width*Math.sin(a)),center.z + .17*Math.cos(a) - .11*Math.sin(a)));}polyline(ribs,.013,C.blue)} }
+// sternum and clavicle
+polyline([P(shoulder.x+.05,-.01,shoulder.z+.10),P(shoulder.x+.44,0,shoulder.z+.08)],.032,C.light);
+// sacrum and paired pelvis wings
+for(let sy of [-1,1]){let y=sy*.16;const crest=[P(hip3.x-.25,y,hip3.z+.08),P(hip3.x-.20,sy*.28,hip3.z+.23),P(hip3.x+.10,sy*.30,hip3.z+.20),P(hip3.x+.19,y,hip3.z-.06),P(hip3.x-.04,y,hip3.z-.18),P(hip3.x-.24,y,hip3.z+.08)];polyline(crest,.035,C.blue);tube(P(hip3.x+.14,sy*.10,hip3.z-.13),P(hip3.x-.13,sy*.16,hip3.z-.17),.035,C.light);sph(P(hip3.x,sy*.27,hip3.z-.07),.078,C.light)}
+}
+// head and cervical chain
+const neckBase=px(220,184,0),head=px(169,154,0);
+if(skin){tube(shoulder,neckBase,.135,C.white,.29);uvBall(head,[.24,.24,.26],C.white,.40)}
+if(bones){polyline([shoulder,neckBase,head],.041,C.blue);uvBall(head,[.205,.193,.23],C.blue,1,20,13);
+for(let side of [-1,1]){const eyep=P(head.x+.125,side*.123,head.z+.055);uvBall(eyep,[.043,.044,.065],[17,61,125]);tube(P(head.x+.11,side*.1,head.z-.11),P(head.x+.22,side*.09,head.z-.16),.028,C.light)}
+// mandibular jaw
+polyline([P(head.x+.07,-.15,head.z-.12),P(head.x+.14,0,head.z-.22),P(head.x+.07,.15,head.z-.12)],.024,C.light);
+}
+if($('arrows').checked){for(const sy of [-.27,.27]){const sign=sy>0?1:-1;const H=P(hip3.x,0.18*sign,hip3.z),K=P(knee3.x,0.78*sign,knee3.z);const mid=interp(H,K,.44),dir=norm(minus(K,H));const end=plus(mid,mul(dir,.45));line(mid,end,C.orange,4);const side=norm(cross(dir,P(0,1,0)));line(end,plus(plus(end,mul(dir,-.13)),mul(side,.065)),C.orange,3);line(end,plus(plus(end,mul(dir,-.13)),mul(side,-.065)),C.orange,3)}}
+}
+function camera(p,w,h){let a=yaw,el=pitch;let ca=Math.cos(a),sa=Math.sin(a),ce=Math.cos(el),se=Math.sin(el);
+const x=p.x*ca+p.y*sa, depth=-p.x*sa+p.y*ca;const y=p.z*ce-depth*se;
+const dep=p.z*se+depth*ce;const f=1/(1+dep*.075);return{x:w/2+x*115*zoom*f,y:h*.78-y*115*zoom*f,z:dep};}
+function draw(){const W=cv.clientWidth,H=cv.clientHeight,dpr=Math.min(2,window.devicePixelRatio||1);if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)}ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+const q=progress,k=bodyKinematics(q,elapsed*1.3);build(q,elapsed*1.3);
+const projected=scene.map(f=>{const pts=f.v.map(p=>camera(p,W,H));const a=minus(f.v[1],f.v[0]),b=minus(f.v[2],f.v[0]);const n=norm(cross(a,b));const light=.54+.46*Math.abs(n.x*.48+n.y*.53+n.z*.7);return{pts,dep:pts.reduce((s,p)=>s+p.z,0)/pts.length,light,...f}}).sort((a,b)=>b.dep-a.dep);
+for(const f of projected){const pts=f.pts;ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);ctx.closePath();const mult=f.col===C.white?1:f.light;const rgb=f.col.map(n=>Math.max(0,Math.min(255,Math.round(n*mult))));ctx.fillStyle=`rgba(${rgb.join(',')},${f.alpha})`;ctx.fill();}
+for(const L of lineSet){const a=camera(L.a,W,H),b=camera(L.b,W,H);ctx.lineWidth=L.width;ctx.strokeStyle=`rgb(${L.col.join(',')})`;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+}
+function stageProgress(sec){
+ if(sec<=10)return .43*(sec/10);
+ if(sec<=14)return .43+.29*((sec-10)/4);
+ return Math.min(1,.72+.28*((sec-14)/4));
+}
+function stageTime(q){
+ if(q<=.43)return q/.43*10;
+ if(q<=.72)return 10+(q-.43)/.29*4;
+ return 14+(q-.72)/.28*4;
+}
+function tick(ts){if(!last)last=ts;const dt=Math.min(.05,(ts-last)/1000);last=ts;if(playing){elapsed+=dt*Number($('speed').value);progress=stageProgress(Math.min(18,elapsed))}draw();$('progress').value=Math.round(progress*100);$('progressText').textContent=Math.round(progress*100)+'%';$('phase').textContent=progress<.43?'① 大きく膝を浮かせて落とす（約10秒）':progress<.72?'② バウンスを徐々に小さくする':'③ 膝をマットレスに押し込み、骨盤を連動させる';requestAnimationFrame(tick)}
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'⏸ 一時停止':'▶ 再生'};$('reset').onclick=()=>{playing=true;elapsed=0;progress=0;$('play').textContent='⏸ 一時停止'};
+$('progress').oninput=e=>{progress=Number(e.target.value)/100;elapsed=stageTime(progress);playing=false;$('play').textContent='▶ 再生'};
+for(const [id,yy,pp] of [['side',0,-.48],['oblique',1.22,-.69],['front',-Math.PI/2,-.52]]){$(id).onclick=()=>{yaw=yy;pitch=pp;for(const k of ['side','oblique','front'])$(k).classList.toggle('active',k===id)}}
+view.addEventListener('pointerdown',e=>{drag=true;oldX=e.clientX;oldY=e.clientY;view.setPointerCapture(e.pointerId)});view.addEventListener('pointerup',()=>drag=false);view.addEventListener('pointercancel',()=>drag=false);view.addEventListener('pointermove',e=>{if(!drag)return;yaw-=(e.clientX-oldX)*.009;pitch=Math.max(-1.25,Math.min(.35,pitch-(e.clientY-oldY)*.006));oldX=e.clientX;oldY=e.clientY});view.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.6,Math.min(1.9,zoom*(e.deltaY>0?.92:1.08)))},{passive:false});requestAnimationFrame(tick);
+})();
+</script></body></html>
